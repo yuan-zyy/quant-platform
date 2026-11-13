@@ -51,4 +51,5 @@
 - [x] Loopback liveness and bounded readiness probes
 - [x] Low-cardinality loopback HTTP metrics
 - [x] Bounded redacted request audit events
+- [x] Per-tenant active task quotas for the in-memory scheduler
 - [ ] Security, production load tests and HA/DR deployment validation

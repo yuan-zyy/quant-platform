@@ -13,6 +13,40 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BacktestTaskSchedulerTest {
     @Test
+    void canceledRunningTaskRetainsQuotaUntilItsCallbackExits() throws Exception {
+        try (var scheduler = new BacktestTaskScheduler(1, 2, 8, 1)) {
+            var started = new CountDownLatch(1);
+            var interrupted = new CountDownLatch(1);
+            var release = new CountDownLatch(1);
+            var task = scheduler.submit("tenant-a", () -> {
+                started.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException canceled) {
+                    interrupted.countDown();
+                    release.await();
+                }
+                return null;
+            });
+            try {
+                assertTrue(started.await(5, TimeUnit.SECONDS));
+                assertEquals(CANCELED, scheduler.cancel("tenant-a", task.id()).orElseThrow().status());
+                assertTrue(interrupted.await(5, TimeUnit.SECONDS));
+                assertThrows(RejectedExecutionException.class, () -> scheduler.submit("tenant-a", () -> null));
+                var queued = scheduler.submit("tenant-b", () -> fail("canceled task ran"));
+                assertEquals(CANCELED, scheduler.cancel("tenant-b", queued.id()).orElseThrow().status());
+                var barrier = scheduler.submit("tenant-b", () -> null);
+                release.countDown();
+                awaitStatus(scheduler, "tenant-b", barrier.id(), FAILED);
+                var accepted = scheduler.submit("tenant-a", () -> null);
+                awaitStatus(scheduler, "tenant-a", accepted.id(), FAILED);
+            } finally {
+                release.countDown();
+            }
+        }
+    }
+
+    @Test
     void scopesTaskAccessAndReclaimsCanceledQueueCapacity() throws Exception {
         try (var scheduler = new BacktestTaskScheduler(1, 1, 4)) {
             var started = new CountDownLatch(1);

@@ -86,7 +86,7 @@ public final class BacktestDemoServer implements AutoCloseable {
         if (port < 0 || port > 65535) throw new IllegalArgumentException("Invalid QUANT_DEMO_PORT");
         var catalog = catalog();
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 16);
-        var scheduler = new BacktestTaskScheduler(2, 8, 32);
+        var scheduler = new BacktestTaskScheduler(2, 8, 32, 8);
         var requests = Executors.newVirtualThreadPerTaskExecutor();
         var deadlines = new ScheduledThreadPoolExecutor(1);
         deadlines.setRemoveOnCancelPolicy(true);

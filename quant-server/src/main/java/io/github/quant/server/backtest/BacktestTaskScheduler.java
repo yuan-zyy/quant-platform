@@ -40,6 +40,7 @@ public final class BacktestTaskScheduler implements AutoCloseable {
         private Instant finishedAt;
         private BacktestEngine.ReplayResult result;
         private FutureTask<Void> execution;
+        private TenantTaskQuota.Ticket ticket;
 
         private Task(String tenantId) {
             this.tenantId = tenantId;
@@ -52,13 +53,19 @@ public final class BacktestTaskScheduler implements AutoCloseable {
 
     private final ThreadPoolExecutor executor;
     private final int historyCapacity;
+    private final TenantTaskQuota tenantQuota;
     private final LinkedHashMap<UUID, Task> tasks = new LinkedHashMap<>();
 
     public BacktestTaskScheduler(int workers, int queueCapacity, int historyCapacity) {
+        this(workers, queueCapacity, historyCapacity, Integer.MAX_VALUE);
+    }
+
+    public BacktestTaskScheduler(int workers, int queueCapacity, int historyCapacity, int maxTasksPerTenant) {
         if (workers < 1 || queueCapacity < 1 || historyCapacity < 1) {
             throw new IllegalArgumentException("scheduler capacities must be positive");
         }
         this.historyCapacity = historyCapacity;
+        tenantQuota = new TenantTaskQuota(maxTasksPerTenant);
         executor = new ThreadPoolExecutor(workers, workers, 0, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(queueCapacity), Thread.ofPlatform().name("backtest-task-", 0).factory());
     }
@@ -72,11 +79,17 @@ public final class BacktestTaskScheduler implements AutoCloseable {
                     .orElseThrow(() -> new RejectedExecutionException("backtest history is full of active tasks"));
         }
         var task = new Task(tenantId);
+        task.ticket = tenantQuota.reserve(tenantId);
         task.execution = new FutureTask<>(() -> {
             run(task, job);
             return null;
         });
-        executor.execute(task.execution);
+        try {
+            executor.execute(task.execution);
+        } catch (RuntimeException | Error failure) {
+            task.ticket.close();
+            throw failure;
+        }
         if (evicted != null) tasks.remove(evicted.id);
         tasks.put(task.id, task);
         return task.snapshot();
@@ -107,9 +120,11 @@ public final class BacktestTaskScheduler implements AutoCloseable {
 
     private void cancel(Task task) {
         if (task.status.terminal()) return;
+        boolean queued = task.status == Status.QUEUED;
         finish(task, Status.CANCELED, null);
         task.execution.cancel(true);
         executor.remove(task.execution);
+        if (queued) task.ticket.close();
     }
 
     private void run(Task task, BacktestJob job) throws Exception {
@@ -122,6 +137,7 @@ public final class BacktestTaskScheduler implements AutoCloseable {
             var result = Objects.requireNonNull(job.run());
             finishIfRunning(task, Status.SUCCEEDED, result);
         } finally {
+            task.ticket.close();
             finishIfRunning(task, Status.FAILED, null);
         }
     }
