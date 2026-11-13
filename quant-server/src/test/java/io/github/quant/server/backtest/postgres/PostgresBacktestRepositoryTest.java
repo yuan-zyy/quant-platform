@@ -150,7 +150,7 @@ class PostgresBacktestRepositoryTest {
         assertEquals(queued.id(), reopened.submit("tenant", "daily", "replay-key").orElseThrow().id());
         var done = reopened.get("tenant", queued.id()).orElseThrow();
         assertEquals("SUCCEEDED", done.status().name());
-        assertEquals("10000.00", done.result().endingEquity());
+        assertEquals(new BigDecimal("10000.00"), done.result().endingEquity());
         assertEquals(0, done.result().fillCount());
     }
 
