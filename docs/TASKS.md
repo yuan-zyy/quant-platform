@@ -39,7 +39,8 @@
 - [ ] Deployment authentication and production paper account storage
 
 ## Sprint 5 — Live trading readiness
-- [ ] OMS/RMS, idempotency, UNKNOWN state recovery and authorized broker adapter
+- [x] Simulated OMS with order idempotency, UNKNOWN reconciliation and per-order risk admission
+- [ ] Durable OMS and authorized external broker adapter
 
 ## Sprint 6 — Production hardening
 - [ ] Security, load tests, HA/DR and recovery drills
