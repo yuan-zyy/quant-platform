@@ -1,1 +1,17 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion><parent><groupId>io.github.yuan-zyy</groupId><artifactId>quant-platform</artifactId><version>0.1.0-SNAPSHOT</version><relativePath>../pom.xml</relativePath></parent><artifactId>quant-portfolio</artifactId></project>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.github.yuan-zyy</groupId>
+    <artifactId>quant-platform</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+  <artifactId>quant-portfolio</artifactId>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.yuan-zyy</groupId>
+      <artifactId>quant-domain</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+</project>

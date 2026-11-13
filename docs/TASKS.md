@@ -2,16 +2,16 @@
 
 ## Sprint 0 — Engineering baseline
 - [x] Repository access confirmed
-- [ ] Maven Java 21 multi-module skeleton
-- [ ] Architecture, task and decision records
-- [ ] CI build/test workflow
+- [x] Maven Java 21 multi-module skeleton
+- [x] Architecture, task and decision records
+- [x] CI build/test workflow
 
 ## Sprint 1 — Core and daily backtest
-- [ ] Instrument, Bar, order, account and position models
-- [ ] Deterministic event contracts and virtual clock
-- [ ] Historical DataFeed and order state machine
-- [ ] Limit matching, fees, portfolio valuation and metrics
-- [ ] Look-ahead and reproducibility tests
+- [x] Instrument, Bar, order, account and position models
+- [x] Deterministic event contracts and virtual clock
+- [x] Historical DataFeed and order state machine
+- [x] Limit matching, fees, portfolio valuation and metrics
+- [x] Look-ahead and reproducibility tests
 
 ## Sprint 2 — Python SDK and runtime
 - [ ] Stable strategy API and protobuf/gRPC contract
