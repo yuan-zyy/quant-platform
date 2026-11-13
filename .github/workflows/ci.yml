@@ -36,12 +36,23 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
       - name: Start temporary ClickHouse container
-        run: docker run --detach --name quant-clickhouse --network none clickhouse/clickhouse-server:26.8.36.3
+        run: |
+          docker run --detach --name quant-clickhouse --publish 127.0.0.1::8123 \
+            --env CLICKHOUSE_USER=quant_ci --env CLICKHOUSE_PASSWORD=quant_ci_password \
+            clickhouse/clickhouse-server:26.8.36.3
       - name: Apply schema and verify publication history
         run: |
+          binding=$(docker port quant-clickhouse 8123/tcp)
+          [[ "$binding" =~ ^127\.0\.0\.1:[0-9]+$ ]]
           for attempt in {1..30}; do
-            if timeout 5s docker exec quant-clickhouse clickhouse-client --query 'SELECT 1'; then
+            if curl --fail --silent --max-time 5 --user quant_ci:quant_ci_password \
+              --data 'SELECT 1' "http://$binding/"; then
               break
             fi
             if [[ "$attempt" == 30 ]]; then
@@ -49,8 +60,17 @@ jobs:
             fi
             sleep 2
           done
-          docker exec -i quant-clickhouse clickhouse-client --multiquery < quant-market/src/main/resources/clickhouse/market_observations_v1.sql
-          docker exec -i quant-clickhouse clickhouse-client --multiquery < quant-market/src/test/resources/clickhouse/market_observations_smoke.sql
+          docker exec -i quant-clickhouse clickhouse-client --user quant_ci --password quant_ci_password --multiquery < quant-market/src/main/resources/clickhouse/market_observations_v1.sql
+          docker exec -i quant-clickhouse clickhouse-client --user quant_ci --password quant_ci_password --multiquery < quant-market/src/test/resources/clickhouse/market_observations_smoke.sql
+          docker exec -i quant-clickhouse clickhouse-client --user quant_ci --password quant_ci_password --multiquery < quant-market/src/main/resources/clickhouse/market_import_batches_v1.sql
+      - name: Verify Java persistent import and replay
+        env:
+          QUANT_CLICKHOUSE_USER: quant_ci
+          QUANT_CLICKHOUSE_PASSWORD: quant_ci_password
+        run: |
+          binding=$(docker port quant-clickhouse 8123/tcp)
+          [[ "$binding" =~ ^127\.0\.0\.1:[0-9]+$ ]]
+          mvn -B -ntp -pl quant-backtest -am "-Dquant.clickhouse.url=http://$binding/" verify
       - name: Collect ClickHouse logs on failure
         if: failure()
         run: docker logs --tail 100 quant-clickhouse

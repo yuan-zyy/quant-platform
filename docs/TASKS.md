@@ -23,8 +23,10 @@
 ## Sprint 3 — Data and factors
 - [x] Historical CSV import, versioned market snapshots and backtest replay feed
 - [x] ClickHouse market observation schema design
-- [ ] Persistent market data adapter and ClickHouse deployment
-- [ ] Factor metadata, versions, PIT snapshots and AST query planner
+- [x] Persistent ClickHouse batch journal adapter for import and replay
+- [ ] ClickHouse deployment and analytical projection
+- [x] Factor metadata, versions and in-memory PIT snapshots
+- [ ] Persistent factor data and AST query planner
 
 ## Sprint 4 — Platform and paper trading
 - [ ] Tenant-aware API, task scheduler, Vue console and PaperBroker

@@ -31,8 +31,16 @@ public final class MarketDataCsvImporter {
      * The reader stays open. The returned count includes rows already present in the store.
      */
     public int importInto(Reader source, VersionedMarketDataStore store) throws IOException {
-        Objects.requireNonNull(source);
         Objects.requireNonNull(store);
+        var observations = read(source, store.datasetVersion());
+        store.appendAll(observations);
+        return observations.size();
+    }
+
+    /** Reads one complete CSV batch without publishing it or closing the reader. */
+    public List<DataFeed.Observation> read(Reader source, String datasetVersion) throws IOException {
+        Objects.requireNonNull(source);
+        Objects.requireNonNull(datasetVersion);
         var reader = new BufferedReader(source);
         String header = reader.readLine();
         if (header != null && header.startsWith("\uFEFF")) header = header.substring(1);
@@ -44,10 +52,9 @@ public final class MarketDataCsvImporter {
         String row;
         int line = 1;
         while ((row = reader.readLine()) != null) {
-            observations.add(readObservation(readFields(row, ++line), store.datasetVersion(), line));
+            observations.add(readObservation(readFields(row, ++line), datasetVersion, line));
         }
-        store.appendAll(observations);
-        return observations.size();
+        return List.copyOf(observations);
     }
 
     private static DataFeed.Observation readObservation(List<String> fields, String version, int line) {

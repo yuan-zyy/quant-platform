@@ -42,6 +42,8 @@ public final class VersionedMarketDataStore {
 
     public String datasetVersion() { return datasetVersion; }
 
+    public synchronized long generation() { return generation; }
+
     /**
      * Appends one atomic batch. A previously published observation is idempotent when the
      * full payload matches, including decimal scale. Open and close keys can be imported

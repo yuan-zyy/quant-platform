@@ -19,7 +19,25 @@ var result = new BacktestEngine().run(snapshot.replayFeed(), startingCash, rules
 
 CSV columns are `dataset_version,event_type,symbol,exchange,session_date,event_time,available_time,open,high,low,close,volume,opening_quantity`. Use ISO dates and UTC timestamps. `OPEN` rows provide `open` and `opening_quantity`. `CLOSE` rows provide `open`, `high`, `low`, `close`, and `volume`. Leave unused columns blank. The importer validates a complete batch before committing it to the store.
 
-## ClickHouse storage design
+## ClickHouse persistence
+
+Apply [market_import_batches_v1.sql](../quant-market/src/main/resources/clickhouse/market_import_batches_v1.sql) to the configured ClickHouse database. For persistent import and replay, use the same CSV with a ClickHouse-backed store:
+
+```java
+var store = new ClickHouseMarketDataStore(clickHouseUri, "daily-v1", writerLockPath, requestHeaders);
+try (var source = Files.newBufferedReader(csvPath, StandardCharsets.UTF_8)) {
+    store.importCsv(source);
+}
+var snapshot = store.snapshot(Instant.parse("2026-01-07T00:00:00Z"));
+```
+
+Each accepted content-changing import creates one immutable row holding its whole batch. Reads verify and rebuild the generation journal before selecting an as-of snapshot. The persistent adapter loads a dataset's batches into memory, so this path is intended for bounded historical datasets. The normalized observation table below is the design for larger analytical queries.
+
+Assign one cooperating writer location per endpoint, database and dataset. All writers for that dataset must use the same lock file on a filesystem with reliable exclusive locks and preserve the adjacent pending-write journal. After an uncertain response, retry the original import through the same writer location. A visible matching batch resolves an uncertain response. If the batch remains invisible, only the same operation may be retried until the earlier write is resolved. Identical repeated journal rows are treated as one generation. Keep write credentials scoped to the worker and configure TLS for remote deployments. Distributed writer coordination, backup and deployment are separate work.
+
+GitHub Actions starts a temporary ClickHouse instance on loopback and runs Java tests for CSV import, generation recovery after a simulated response loss, and backtest execution. The tests can also be run with `mvn -B -ntp -pl quant-backtest -am -Dquant.clickhouse.url=http://127.0.0.1:8123/ verify` against a test database after applying the batch DDL. Set `QUANT_CLICKHOUSE_USER` and `QUANT_CLICKHOUSE_PASSWORD` if required.
+
+## ClickHouse analytical table design
 
 Store immutable publications in a `MergeTree` table. Keep all versions of each observation so an `as_of` query can select the latest one at or before its cutoff. A background merge must preserve historical publications. The ingest boundary owns uniqueness and conflict validation for `(dataset_version, exchange, symbol, session_date, observation_kind, available_time)`.
 
@@ -27,4 +45,8 @@ The executable DDL lives in [market_observations_v1.sql](../quant-market/src/mai
 
 For a snapshot, filter on dataset version, instrument/date range, `available_time <= as_of` and `import_generation <= pinned_generation`, then group by instrument, date and observation kind and use `argMax(tuple(...), available_time)` to select the payload and timestamps together. Use `argMin` to select first publications for replay. Enforce distinct availability timestamps for different payloads of the same key before loading, so the aggregates have a single winner. A future adapter should expose only fully committed import generations. Reject prices that cannot be represented exactly by the selected decimal scale and validate dates against the supported `DateTime64(9)` range before loading.
 
-GitHub Actions applies this DDL in a temporary ClickHouse container and verifies revision visibility, generation pinning and first-publication replay. The current executable importer and snapshot store use process memory. ClickHouse deployment, persistent batch manifests, and factor data remain future work. [MergeTree reference](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree) · [DateTime64 reference](https://clickhouse.com/docs/reference/data-types/datetime64)
+GitHub Actions applies this DDL and verifies revision visibility, generation pinning and first-publication replay. A production projection from the persistent batch journal into the analytical observation table remains planned. [MergeTree reference](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree) · [DateTime64 reference](https://clickhouse.com/docs/reference/data-types/datetime64)
+
+## Factor research data
+
+`FactorStore` registers immutable definitions by factor key and version. Values carry both event and publication times and preserve exact decimals. A snapshot exposes only the requested version and publications available by the cutoff. Store generation pinning preserves old snapshots after backfilled revisions. This foundation uses memory. Persistent factor storage, AST queries and strategy integration remain planned.
