@@ -15,9 +15,10 @@
 
 ## Sprint 2 — Python SDK and runtime
 - [x] Versioned local strategy contract and Python SDK
-- [ ] Protobuf/gRPC contract for remote workers
+- [x] Protobuf/gRPC contract for remote workers
 - [x] Trusted local subprocess lifecycle, timeout and cancellation
-- [ ] Tenant sandbox and resource isolation
+- [x] Linux strategy container with job-level resource isolation
+- [ ] Tenant-aware scheduling, image intake and execution-host provisioning
 
 ## Sprint 3 — Data and factors
 - [ ] Market data ingestion and ClickHouse schema

@@ -16,8 +16,19 @@ The Java integration test launches `python -m quant_strategy quant_strategy.exam
 
 The worker aborts a failed request. The Java caller can cancel an in-flight exchange, and a timeout or broken protocol terminates the worker session. Replay results are returned only after successful completion. Stdout carries protocol frames. The local launcher discards stderr to avoid unbounded output and pipe backpressure.
 
-## Execution boundary
+## Execution boundaries
 
-This subprocess mode is for trusted local strategy code. It runs with the operating-system access of its launcher. Before accepting tenant-uploaded code, provision an isolated execution environment per job with a restricted identity, explicit file and network access, and CPU, memory, process and wall-clock limits. The scheduler must be able to terminate that environment as a unit, including descendants. Keep market data, artifacts and diagnostics scoped to the tenant and job.
+The subprocess mode is for trusted local strategy code and runs with the operating-system access of its launcher. On a Linux execution host, the Docker transport starts one container per strategy job from an approved immutable image. The worker supplies strategy input over stdin. The container runs with a non-root identity, a read-only root filesystem, bounded writable scratch space, network disabled, and CPU, memory, process and wall-clock limits. The launcher removes the container at session end or cancellation. The Docker daemon and its client belong on a dedicated execution host. Restrict access to the daemon and keep strategy images and job data scoped to the tenant.
 
-The versioned JSON-lines contract connects a backtest worker to its local Python process. Protobuf/gRPC for the remote execution boundary remains planned. Its compatibility and retry semantics need to account for stateful strategy callbacks.
+The versioned JSON Lines contract connects the worker to Python. The [remote worker module](../quant-worker-rpc/README.md) wraps it in a protobuf/gRPC bidirectional stream for remote execution. A stream owns a single stateful strategy session and sends callbacks in sequence. The service creates the session through a launcher supplied by the operator. Use the service behind an authenticated internal boundary. A disconnected stream ends its session. Restart a failed backtest from the beginning if a callback outcome is uncertain, since replaying a callback on a replacement session could produce a different result.
+
+## Verify the Linux container boundary
+
+From the repository root on a Linux host with Docker:
+
+```sh
+image=$(docker build --quiet -f quant-worker/sandbox/Dockerfile .)
+mvn -B -ntp -Dquant.python=python "-Dquant.sandbox.image=$image" verify
+```
+
+GitHub Actions runs the same container tests with an immutable image ID. See the [sandbox runtime documentation](../quant-worker/sandbox/README.md) for worker-host and strategy image requirements. Provisioning, authenticated remote worker deployment, image intake and multi-tenant scheduling are deployment work.

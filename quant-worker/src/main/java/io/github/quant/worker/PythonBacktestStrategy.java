@@ -11,10 +11,10 @@ import java.util.concurrent.TimeoutException;
 
 /** Adapts one dedicated Python worker process to a daily backtest strategy. */
 public final class PythonBacktestStrategy implements BacktestEngine.Strategy, AutoCloseable {
-    private final StrategyProcess process;
+    private final StrategyTransport process;
     private long requestNumber;
 
-    public PythonBacktestStrategy(StrategyProcess process) {
+    public PythonBacktestStrategy(StrategyTransport process) {
         this.process = Objects.requireNonNull(process);
     }
 
@@ -62,7 +62,11 @@ public final class PythonBacktestStrategy implements BacktestEngine.Strategy, Au
     }
 
     private IllegalStateException abort(String message, Exception cause) {
-        process.cancel();
+        try {
+            process.cancel();
+        } catch (RuntimeException cleanup) {
+            cause.addSuppressed(cleanup);
+        }
         return new IllegalStateException(message, cause);
     }
 }

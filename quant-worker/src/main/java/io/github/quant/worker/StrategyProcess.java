@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /** An isolated protocol stream for one trusted local strategy process. */
-public final class StrategyProcess implements AutoCloseable {
+public final class StrategyProcess implements StrategyTransport {
     public static final int MAX_LINE_BYTES = 1_048_576;
 
     private final Process process;
@@ -42,11 +42,20 @@ public final class StrategyProcess implements AutoCloseable {
 
     public static StrategyProcess start(List<String> command, Path workingDirectory, Duration requestTimeout)
             throws IOException {
+        var builder = new ProcessBuilder(List.copyOf(command)).directory(Objects.requireNonNull(workingDirectory).toFile());
+        return start(builder, requestTimeout);
+    }
+
+    static StrategyProcess start(List<String> command, Duration requestTimeout) throws IOException {
+        var builder = new ProcessBuilder(List.copyOf(command));
+        builder.environment().clear();
+        return start(builder, requestTimeout);
+    }
+
+    private static StrategyProcess start(ProcessBuilder builder, Duration requestTimeout) throws IOException {
         long timeoutNanos = requestTimeout.toNanos();
         if (timeoutNanos <= 0) throw new IllegalArgumentException("request timeout must be positive");
-        var builder = new ProcessBuilder(List.copyOf(command))
-                .directory(Objects.requireNonNull(workingDirectory).toFile())
-                .redirectError(ProcessBuilder.Redirect.DISCARD);
+        builder.redirectError(ProcessBuilder.Redirect.DISCARD);
         return new StrategyProcess(builder.start(), timeoutNanos);
     }
 

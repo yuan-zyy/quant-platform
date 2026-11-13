@@ -19,4 +19,14 @@ jobs:
           python-version: '3.12'
       - run: python -m unittest discover -s tests
         working-directory: python-sdk
-      - run: mvn -B -ntp -Dquant.python=python verify
+      - name: Build the strategy sandbox test image
+        id: sandbox
+        run: |
+          image=$(docker build --quiet -f quant-worker/sandbox/Dockerfile .)
+          [[ "$image" =~ ^sha256:[a-f0-9]{64}$ ]]
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+      - name: Verify Java, Python integration and sandbox isolation
+        env:
+          SANDBOX_IMAGE: ${{ steps.sandbox.outputs.image }}
+          QUANT_HOST_SECRET: smoke-probe
+        run: mvn -B -ntp -Dquant.python=python "-Dquant.sandbox.image=$SANDBOX_IMAGE" verify

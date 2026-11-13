@@ -1,0 +1,8 @@
+**
+!python-sdk/
+!python-sdk/quant_strategy/
+!python-sdk/quant_strategy/*.py
+!quant-worker/
+!quant-worker/sandbox/
+!quant-worker/sandbox/launch.py
+!quant-worker/sandbox/smoke_strategy.py

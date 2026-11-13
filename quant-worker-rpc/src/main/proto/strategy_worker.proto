@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package quant.worker.v1;
+
+option java_package = "io.github.quant.worker.rpc.v1";
+option java_multiple_files = true;
+
+service StrategyWorker {
+  // A stream owns one stateful strategy process. Clients send one frame at a time.
+  rpc Run(stream StrategyRequest) returns (stream StrategyResponse);
+}
+
+message StrategyRequest {
+  uint32 protocol_version = 1;
+  // Consecutive positive numbers beginning at one. Replays and gaps terminate the stream.
+  uint64 sequence = 2;
+  // One UTF-8 StrategyProtocol v1 JSON object with no trailing newline.
+  string strategy_json = 3;
+}
+
+message StrategyResponse {
+  uint32 protocol_version = 1;
+  uint64 sequence = 2;
+  string strategy_json = 3;
+}
