@@ -21,7 +21,9 @@
 - [ ] Tenant-aware scheduling, image intake and execution-host provisioning
 
 ## Sprint 3 — Data and factors
-- [ ] Market data ingestion and ClickHouse schema
+- [x] Historical CSV import, versioned market snapshots and backtest replay feed
+- [x] ClickHouse market observation schema design
+- [ ] Persistent market data adapter and ClickHouse deployment
 - [ ] Factor metadata, versions, PIT snapshots and AST query planner
 
 ## Sprint 4 — Platform and paper trading

@@ -17,3 +17,4 @@ Java 21 + Python 量化研究与交易平台，面向中国 A 股、ETF、可转
 - [Decisions](docs/DECISIONS.md)
 - [Sprint 1 日线回测](docs/SPRINT-1.md)
 - [Sprint 2 Python 策略执行](docs/SPRINT-2.md)
+- [Sprint 3 历史行情与时点快照](docs/SPRINT-3.md)
