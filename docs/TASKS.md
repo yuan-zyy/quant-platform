@@ -14,8 +14,10 @@
 - [x] Look-ahead and reproducibility tests
 
 ## Sprint 2 — Python SDK and runtime
-- [ ] Stable strategy API and protobuf/gRPC contract
-- [ ] Worker lifecycle, isolation, timeout and cancellation
+- [x] Versioned local strategy contract and Python SDK
+- [ ] Protobuf/gRPC contract for remote workers
+- [x] Trusted local subprocess lifecycle, timeout and cancellation
+- [ ] Tenant sandbox and resource isolation
 
 ## Sprint 3 — Data and factors
 - [ ] Market data ingestion and ClickHouse schema

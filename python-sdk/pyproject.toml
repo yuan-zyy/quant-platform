@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quant-platform-strategy"
+version = "0.1.0"
+description = "Python strategy SDK for quant-platform replay"
+requires-python = ">=3.10"
+dependencies = []
+readme = "README.md"
+
+[tool.setuptools]
+packages = ["quant_strategy"]

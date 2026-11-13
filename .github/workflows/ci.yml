@@ -1,4 +1,4 @@
-name: Java CI
+name: Java and Python CI
 on:
   push:
     branches: [main, develop, 'feature/**']
@@ -14,4 +14,9 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - run: mvn -B -ntp verify
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s tests
+        working-directory: python-sdk
+      - run: mvn -B -ntp -Dquant.python=python verify
