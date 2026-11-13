@@ -12,6 +12,7 @@ import io.github.quant.server.backtest.BacktestScenarioCatalog;
 import io.github.quant.server.backtest.BacktestTaskScheduler;
 import io.github.quant.server.backtest.http.BacktestHttpApi;
 import io.github.quant.server.backtest.http.BearerTenantAuthenticator;
+import io.github.quant.server.backtest.http.InFlightRequestGuard;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -19,10 +20,14 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 /** Loopback-only demonstration server with a fixed sample scenario. */
 public final class BacktestDemoServer implements AutoCloseable {
@@ -32,10 +37,15 @@ public final class BacktestDemoServer implements AutoCloseable {
 
     private final HttpServer server;
     private final BacktestTaskScheduler scheduler;
+    private final ExecutorService requests;
+    private final ScheduledThreadPoolExecutor deadlines;
 
-    private BacktestDemoServer(HttpServer server, BacktestTaskScheduler scheduler) {
+    private BacktestDemoServer(HttpServer server, BacktestTaskScheduler scheduler, ExecutorService requests,
+                               ScheduledThreadPoolExecutor deadlines) {
         this.server = server;
         this.scheduler = scheduler;
+        this.requests = requests;
+        this.deadlines = deadlines;
     }
 
     public static void main(String[] args) throws Exception {
@@ -71,8 +81,13 @@ public final class BacktestDemoServer implements AutoCloseable {
         var catalog = catalog();
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 16);
         var scheduler = new BacktestTaskScheduler(2, 8, 32);
-        server.createContext(BacktestHttpApi.PATH, new BacktestHttpApi(scheduler, authenticator, catalog::resolve));
-        return new BacktestDemoServer(server, scheduler);
+        var requests = Executors.newVirtualThreadPerTaskExecutor();
+        var deadlines = new ScheduledThreadPoolExecutor(1);
+        deadlines.setRemoveOnCancelPolicy(true);
+        server.setExecutor(requests);
+        var api = new BacktestHttpApi(scheduler, authenticator, catalog::resolve);
+        server.createContext(BacktestHttpApi.PATH, new InFlightRequestGuard(8, api, deadlines, Duration.ofSeconds(5)));
+        return new BacktestDemoServer(server, scheduler, requests, deadlines);
     }
 
     public void start() {
@@ -86,6 +101,8 @@ public final class BacktestDemoServer implements AutoCloseable {
     @Override
     public void close() {
         server.stop(0);
+        requests.shutdownNow();
+        deadlines.shutdownNow();
         scheduler.close();
     }
 

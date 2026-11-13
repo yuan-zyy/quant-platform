@@ -15,3 +15,7 @@ The harness accepts only loopback HTTP origins and refuses redirects. CI runs a 
 CI uses a temporary PostgreSQL container. The drill creates `quant_recovery_source` and `quant_recovery_target` inside it, applies migrations to the source, seeds simulated tasks and orders, and streams a custom-format dump into the target. The target is restored in a single transaction. SQL checks validate state and constraints before an optional callback runs. Cleanup drops only the two databases created by the drill.
 
 Run `bash tools/recovery/postgres-restore.sh DISPOSABLE_POSTGRES_CONTAINER` with `PGUSER` and `PGPASSWORD` set for the test container. An optional command after the container name receives the restored database name in `QUANT_RECOVERY_RESTORED_DB` and can test the restored state before cleanup. CI uses that hook to run the Java workers against the restored database. It verifies queued tasks resume, expired leases are reclaimed, stale workers cannot publish results, and due uncertain orders reconcile without a new submission.
+
+## Backtest HTTP admission
+
+The loopback demo admits at most eight concurrent handler calls. Excess requests receive a generic `503` with `Retry-After: 1`. The request deadline closes the exchange after five seconds. This deadline governs the HTTP connection. An admitted task runs independently and is canceled through the authenticated task endpoint. The existing submit handler still limits the scenario ID to 128 bytes. Connection and header limits belong at the deployment ingress.
