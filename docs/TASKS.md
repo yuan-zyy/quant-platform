@@ -26,7 +26,8 @@
 - [x] Persistent ClickHouse batch journal adapter for import and replay
 - [ ] ClickHouse deployment and analytical projection
 - [x] Factor metadata, versions and in-memory PIT snapshots
-- [ ] Persistent factor data and AST query planner
+- [x] Typed factor AST planner and point-in-time expression evaluation
+- [ ] Persistent factor data
 
 ## Sprint 4 — Platform and paper trading
 - [ ] Tenant-aware API, task scheduler, Vue console and PaperBroker

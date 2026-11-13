@@ -49,4 +49,17 @@ GitHub Actions applies this DDL and verifies revision visibility, generation pin
 
 ## Factor research data
 
-`FactorStore` registers immutable definitions by factor key and version. Values carry both event and publication times and preserve exact decimals. A snapshot exposes only the requested version and publications available by the cutoff. Store generation pinning preserves old snapshots after backfilled revisions. This foundation uses memory. Persistent factor storage, AST queries and strategy integration remain planned.
+`FactorStore` registers immutable definitions by factor key and version. Values carry both event and publication times and preserve exact decimals. A snapshot exposes only the requested version and publications available by the cutoff. Store generation pinning preserves old snapshots after backfilled revisions.
+
+The typed factor planner evaluates explicit version references, decimal arithmetic and boolean predicates for one instrument at a time. Supply the bar's event time, the strategy's current processing time and a pinned factor-store generation when evaluating a plan in a backtest. A reference looks up the exact event time and selects the latest revision visible at processing time. Use the same generation for every callback in a reproducible run.
+
+```java
+var signal = new FactorQuery.Reference(new FactorStore.FactorVersion("signal", "1"));
+var plan = FactorQueryPlanner.plan(new FactorQuery.Compare(FactorQuery.Comparison.GT,
+        signal, new FactorQuery.Literal(BigDecimal.ZERO)));
+long generation = factors.generation();
+// In BacktestEngine.Strategy.onClose:
+var buy = plan.evaluate(factors, close.instrument(), close.eventTime(), context.processingTime(), generation);
+```
+
+A visible factor version with no value at the requested event returns an empty result if that value is needed. An undefined or unavailable factor version is a query error. Conditional expressions evaluate only the selected value branch. Decimal addition, subtraction and multiplication are exact. Division uses `DECIMAL128` and raises an arithmetic error on a zero divisor. The evaluator accepts trusted Java expressions and uses the in-memory factor store. Persistent factor storage and cross-sectional or rolling queries remain planned.

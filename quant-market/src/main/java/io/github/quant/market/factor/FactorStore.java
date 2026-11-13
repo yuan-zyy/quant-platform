@@ -70,6 +70,9 @@ public final class FactorStore {
     private final Map<FactorVersion, History> histories = new HashMap<>();
     private long generation;
 
+    /** Captures a common journal position for queries that read multiple factor versions. */
+    public synchronized long generation() { return generation; }
+
     /** Publishes a definition once. A changed definition requires a new version. */
     public synchronized void register(Definition definition) {
         var existing = histories.get(definition.factor());
