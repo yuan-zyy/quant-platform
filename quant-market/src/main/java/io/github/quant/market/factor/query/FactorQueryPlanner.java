@@ -1,6 +1,7 @@
 package io.github.quant.market.factor.query;
 
 import io.github.quant.domain.Instrument;
+import io.github.quant.market.factor.FactorSnapshotReader;
 import io.github.quant.market.factor.FactorStore;
 import io.github.quant.market.factor.FactorStore.FactorVersion;
 
@@ -54,21 +55,37 @@ public final class FactorQueryPlanner {
         }
 
         public Optional<T> evaluate(FactorStore store, Instrument instrument, Instant eventTime, Instant asOf) {
-            return evaluate(store, instrument, eventTime, asOf, store.generation());
+            return evaluate((FactorSnapshotReader) store, instrument, eventTime, asOf);
         }
 
         public Optional<T> evaluate(FactorStore store, Instrument instrument, Instant eventTime,
                                     Instant asOf, long generation) {
+            return evaluate((FactorSnapshotReader) store, instrument, eventTime, asOf, generation);
+        }
+
+        public Optional<T> evaluate(FactorSnapshotReader reader, Instrument instrument, Instant eventTime,
+                                    Instant asOf) {
+            long generation = reader.generation();
+            return evaluateAt(reader, instrument, eventTime, asOf, generation, generation);
+        }
+
+        public Optional<T> evaluate(FactorSnapshotReader reader, Instrument instrument, Instant eventTime,
+                                    Instant asOf, long generation) {
+            return evaluateAt(reader, instrument, eventTime, asOf, generation, reader.generation());
+        }
+
+        private Optional<T> evaluateAt(FactorSnapshotReader reader, Instrument instrument, Instant eventTime,
+                                        Instant asOf, long generation, long latestGeneration) {
             Objects.requireNonNull(instrument);
             Objects.requireNonNull(eventTime);
             Objects.requireNonNull(asOf);
             if (eventTime.isAfter(asOf)) throw new IllegalArgumentException("factor event time exceeds cutoff");
-            if (generation < 0 || generation > store.generation()) {
+            if (generation < 0 || generation > latestGeneration) {
                 throw new IllegalArgumentException("unknown factor generation");
             }
             var values = new LinkedHashMap<FactorVersion, Optional<BigDecimal>>();
             for (var version : versions) {
-                var snapshot = store.snapshot(version, asOf, generation);
+                var snapshot = reader.snapshot(version, asOf, generation);
                 var value = snapshot.values().stream()
                         .filter(row -> row.instrument().equals(instrument) && row.eventTime().equals(eventTime))
                         .map(FactorStore.Value::value)

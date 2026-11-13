@@ -28,7 +28,7 @@
 - [ ] ClickHouse production deployment and materialized analytical storage
 - [x] Factor metadata, versions and in-memory PIT snapshots
 - [x] Typed factor AST planner and point-in-time expression evaluation
-- [ ] Persistent factor data
+- [x] Persistent ClickHouse factor definitions, values and planner read views
 
 ## Sprint 4 — Platform and paper trading
 - [ ] Tenant-aware API, task scheduler, Vue console and PaperBroker

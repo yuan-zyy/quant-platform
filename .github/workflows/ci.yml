@@ -63,6 +63,7 @@ jobs:
           docker exec -i quant-clickhouse clickhouse-client --user quant_ci --password quant_ci_password --multiquery < quant-market/src/main/resources/clickhouse/market_observations_v1.sql
           docker exec -i quant-clickhouse clickhouse-client --user quant_ci --password quant_ci_password --multiquery < quant-market/src/test/resources/clickhouse/market_observations_smoke.sql
           docker exec -i quant-clickhouse clickhouse-client --user quant_ci --password quant_ci_password --multiquery < quant-market/src/main/resources/clickhouse/market_import_batches_v1.sql
+          docker exec -i quant-clickhouse clickhouse-client --user quant_ci --password quant_ci_password --multiquery < quant-market/src/main/resources/clickhouse/factor_import_batches_v1.sql
           docker exec -i quant-clickhouse clickhouse-client --user quant_ci --password quant_ci_password --multiquery < quant-market/src/main/resources/clickhouse/market_observations_view_v1.sql
           docker exec -i quant-clickhouse clickhouse-client --user quant_ci --password quant_ci_password --multiquery < quant-market/src/test/resources/clickhouse/market_observations_view_smoke.sql
       - name: Verify Java persistent import and replay

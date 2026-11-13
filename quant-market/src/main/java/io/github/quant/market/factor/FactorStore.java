@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /** In-memory journal for immutable factor definitions and published value revisions. */
-public final class FactorStore {
+public final class FactorStore implements FactorSnapshotReader {
     public record FactorVersion(String name, String version) {
         public FactorVersion {
             if (name.isBlank() || version.isBlank()) {
@@ -71,6 +71,7 @@ public final class FactorStore {
     private long generation;
 
     /** Captures a common journal position for queries that read multiple factor versions. */
+    @Override
     public synchronized long generation() { return generation; }
 
     /** Publishes a definition once. A changed definition requires a new version. */
@@ -114,6 +115,7 @@ public final class FactorStore {
     }
 
     /** Selects the latest visible publication per instrument and event at a pinned generation. */
+    @Override
     public synchronized Snapshot snapshot(FactorVersion factor, Instant asOf, long atGeneration) {
         Objects.requireNonNull(asOf);
         if (atGeneration < 0 || atGeneration > generation) {
