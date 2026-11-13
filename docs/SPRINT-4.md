@@ -16,6 +16,16 @@ This service stores task state in process memory. Configure authenticated transp
 
 The [local Vue console](CONSOLE.md) exercises this API against a loopback demo server.
 
+## PostgreSQL-backed task execution
+
+Apply the [task migration](../quant-server/src/main/resources/db/migration/V001__backtest_tasks.sql) and supply a PostgreSQL JDBC connection to the durable task service. The Maven `postgres` profile includes the JDBC driver. Keep the existing memory scheduler for the loopback demo.
+
+An optional `Idempotency-Key` on `POST /v1/backtests` is scoped to the authenticated tenant in durable mode. Retrying the same scenario and key returns the original task, including its bound scenario revision. Reusing the key for a different scenario returns `409`. Submissions without a key create separate tasks. The worker must resolve the stored scenario version to the same trusted strategy, data snapshot and configuration after restart.
+
+The repository claims one due task in a transaction with `FOR UPDATE SKIP LOCKED` and increments its lease epoch. Renewal and terminal writes are fenced by task identity, worker and epoch while the lease is valid. Cancellation makes the task terminal immediately. A worker that loses its lease cannot publish a result. Expired attempts are recovered by subsequent polling and can be retried up to the configured limit. Replay can execute more than once across worker failures. Only a current lease can publish its result.
+
+The worker exposes `runOnce()` for an operator-managed poll loop and renews leases while running a task. Closing a worker stops its local execution. A different worker can recover the task once its lease expires. HTTP keeps the existing submit, status and cancel routes and returns the same metrics summary. Production configuration must supply durable scenario resolution and manage worker polling and database connections.
+
 ## Paper broker
 
 `quant-paper` provides an in-memory simulated brokerage account. Instantiate a `PaperBroker` with cash, instrument rules and execution costs. Submit or cancel a limit order using its client order ID, then feed historical or simulated opening observations to advance matching. The paper broker shares the replay matcher, so lot size, opening liquidity, slippage, fees, cash checks and T+1 eligibility follow the same rules.
