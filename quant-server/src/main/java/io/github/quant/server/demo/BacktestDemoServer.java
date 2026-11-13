@@ -13,6 +13,7 @@ import io.github.quant.server.backtest.BacktestTaskScheduler;
 import io.github.quant.server.backtest.http.BacktestHttpApi;
 import io.github.quant.server.backtest.http.BearerTenantAuthenticator;
 import io.github.quant.server.backtest.http.InFlightRequestGuard;
+import io.github.quant.server.health.HealthHttpHandler;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -39,13 +40,15 @@ public final class BacktestDemoServer implements AutoCloseable {
     private final BacktestTaskScheduler scheduler;
     private final ExecutorService requests;
     private final ScheduledThreadPoolExecutor deadlines;
+    private final HealthHttpHandler health;
 
     private BacktestDemoServer(HttpServer server, BacktestTaskScheduler scheduler, ExecutorService requests,
-                               ScheduledThreadPoolExecutor deadlines) {
+                               ScheduledThreadPoolExecutor deadlines, HealthHttpHandler health) {
         this.server = server;
         this.scheduler = scheduler;
         this.requests = requests;
         this.deadlines = deadlines;
+        this.health = health;
     }
 
     public static void main(String[] args) throws Exception {
@@ -87,7 +90,9 @@ public final class BacktestDemoServer implements AutoCloseable {
         server.setExecutor(requests);
         var api = new BacktestHttpApi(scheduler, authenticator, catalog::resolve);
         server.createContext(BacktestHttpApi.PATH, new InFlightRequestGuard(8, api, deadlines, Duration.ofSeconds(5)));
-        return new BacktestDemoServer(server, scheduler, requests, deadlines);
+        var health = new HealthHttpHandler(Duration.ofMillis(500), () -> !requests.isShutdown());
+        server.createContext("/health", health);
+        return new BacktestDemoServer(server, scheduler, requests, deadlines, health);
     }
 
     public void start() {
@@ -103,6 +108,7 @@ public final class BacktestDemoServer implements AutoCloseable {
         server.stop(0);
         requests.shutdownNow();
         deadlines.shutdownNow();
+        health.close();
         scheduler.close();
     }
 

@@ -19,3 +19,5 @@ Run `bash tools/recovery/postgres-restore.sh DISPOSABLE_POSTGRES_CONTAINER` with
 ## Backtest HTTP admission
 
 The loopback demo admits at most eight concurrent handler calls. Excess requests receive a generic `503` with `Retry-After: 1`. The request deadline closes the exchange after five seconds. This deadline governs the HTTP connection. An admitted task runs independently and is canceled through the authenticated task endpoint. The existing submit handler still limits the scenario ID to 128 bytes. Connection and header limits belong at the deployment ingress.
+
+The demo provides `GET /health/live` and `GET /health/ready` on the loopback listener. Liveness confirms the HTTP listener responds. Readiness checks the demo request executor and returns a generic `503` on failure. The reusable readiness handler accepts one injected probe at a time and times out the result. Probes should honor interruption and configure their own I/O timeouts. The demo has no external database dependency, so the readiness endpoint does not check database health.

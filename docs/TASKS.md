@@ -48,4 +48,5 @@
 - [x] Reproducible loopback backtest load smoke test and latency reporting
 - [x] PostgreSQL backup and restore drill for task and order recovery
 - [x] Loopback HTTP handler admission and exchange deadline
+- [x] Loopback liveness and bounded readiness probes
 - [ ] Security, production load tests and HA/DR deployment validation

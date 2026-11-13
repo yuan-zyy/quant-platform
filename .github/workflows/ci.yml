@@ -54,12 +54,13 @@ jobs:
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true; rm -f -- "$credentials"' EXIT
           for attempt in {1..20}; do
-            if curl --silent --output /dev/null --max-time 1 "$QUANT_CONSOLE_TEST_URL/v1/backtests"; then
+            if curl --fail --silent --output /dev/null --max-time 1 "$QUANT_CONSOLE_TEST_URL/health/ready"; then
               break
             fi
             [[ "$attempt" != 20 ]]
             sleep 1
           done
+          curl --fail --silent --max-time 1 "$QUANT_CONSOLE_TEST_URL/health/live"
           npm --prefix web-console test
           node --test tools/load/backtest-load.test.mjs
           QUANT_LOAD_URL="$QUANT_CONSOLE_TEST_URL" QUANT_LOAD_JOBS=12 QUANT_LOAD_CONCURRENCY=4 node tools/load/backtest-load.mjs
