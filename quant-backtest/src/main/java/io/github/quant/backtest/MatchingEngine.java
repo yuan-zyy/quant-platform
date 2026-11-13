@@ -11,15 +11,16 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-final class MatchingEngine {
+/** Opening-auction matching shared by historical backtests and paper execution. */
+public final class MatchingEngine {
     private final ExecutionCosts costs;
 
-    MatchingEngine(ExecutionCosts costs) {
+    public MatchingEngine(ExecutionCosts costs) {
         this.costs = costs;
     }
 
-    void match(Open opening, TradingRules rules, List<LimitOrder> orders, Portfolio portfolio,
-               List<BacktestEngine.Fill> fills, Instant processingTime) {
+    public void match(Open opening, TradingRules rules, List<LimitOrder> orders, Portfolio portfolio,
+                      List<BacktestEngine.Fill> fills, Instant processingTime) {
         long liquidity = opening.availableQuantity();
         for (LimitOrder order : orders) {
             if (liquidity == 0) break;

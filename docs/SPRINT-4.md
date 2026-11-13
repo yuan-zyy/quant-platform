@@ -13,3 +13,11 @@ Mount `BacktestHttpApi` on a JDK HTTP server and supply an authenticator that de
 The scheduler bounds workers, queued tasks and retained history. Completed tasks may be evicted when new tasks arrive. A full queue or unavailable scheduler returns `503`. Cancellation removes queued work or interrupts the running worker. The Java replay checks interruption between events and during loading. Scenario feeds and strategies that perform blocking work must also respond to interruption.
 
 This service stores task state in process memory. Configure authenticated transport, quotas and durable task state before operating it as a production tenant service. The HTTP adapter runs registered scenarios supplied by the operator.
+
+## Paper broker
+
+`quant-paper` provides an in-memory simulated brokerage account. Instantiate a `PaperBroker` with cash, instrument rules and execution costs. Submit or cancel a limit order using its client order ID, then feed historical or simulated opening observations to advance matching. The paper broker shares the replay matcher, so lot size, opening liquidity, slippage, fees, cash checks and T+1 eligibility follow the same rules.
+
+Supply command times and opening availability times in chronological order. An opening can fill only orders submitted before its event time. A cancellation processed before a delayed opening arrives takes effect before that observation is matched. Repeating an identical submit or opening does not change the account. A different order or opening payload with the same key is rejected. Check order and portfolio snapshots to read the current account state.
+
+The broker instance represents one simulated account. State and deduplication are process-local. Multi-account routing, persistent order state and production risk controls remain separate work.
