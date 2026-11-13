@@ -20,6 +20,9 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
@@ -41,9 +44,11 @@ class PostgresOrderManagementServiceTest {
     @BeforeEach
     void migrate() throws Exception {
         try (var source = Objects.requireNonNull(getClass().getResourceAsStream("/db/migration/V002__broker_orders.sql"));
+             var scheduling = Objects.requireNonNull(getClass().getResourceAsStream("/db/migration/V003__broker_order_reconciliation.sql"));
              var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
             statement.execute("DROP TABLE IF EXISTS broker_order");
             statement.execute(new String(source.readAllBytes(), StandardCharsets.UTF_8));
+            statement.execute(new String(scheduling.readAllBytes(), StandardCharsets.UTF_8));
         }
     }
 
@@ -92,6 +97,53 @@ class PostgresOrderManagementServiceTest {
         });
         assertEquals(UNKNOWN, restarted.submit(ACCOUNT, "abandoned", REQUEST).status());
         assertEquals(UNKNOWN, restarted.reconcile(ACCOUNT, "abandoned").orElseThrow().status());
+    }
+
+    @Test
+    void claimsDueOrdersOnceAcrossWorkersAndAllowsRetryAfterTheDelay() throws Exception {
+        var key = new BrokerAdapter.SubmissionKey(ACCOUNT, "needs-lookup");
+        var repository = new PostgresOrderRepository(dataSource);
+        var submission = new BrokerAdapter.Submission(key, "SSE", "600000", BrokerAdapter.Side.BUY,
+                100, REQUEST.limit());
+        repository.reserve(submission, DEADLINE);
+        var candidates = new PostgresReconciliationCandidates(dataSource);
+        assertTrue(candidates.claimReconciliationCandidates(1, Duration.ZERO, DEADLINE).isEmpty());
+        repository.complete(key, new BrokerAdapter.Unknown());
+        assertTrue(candidates.claimReconciliationCandidates(1, DEADLINE, DEADLINE).isEmpty());
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var start = new CountDownLatch(1);
+            var first = pool.submit(() -> {
+                start.await();
+                return candidates.claimReconciliationCandidates(1, Duration.ZERO, DEADLINE);
+            });
+            var second = pool.submit(() -> {
+                start.await();
+                return candidates.claimReconciliationCandidates(1, Duration.ZERO, DEADLINE);
+            });
+            start.countDown();
+            var a = first.get(10, TimeUnit.SECONDS);
+            var b = second.get(10, TimeUnit.SECONDS);
+            assertEquals(1, a.size() + b.size());
+            assertEquals(key, a.isEmpty() ? b.getFirst() : a.getFirst());
+        }
+        try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+            statement.executeUpdate("UPDATE broker_order SET next_reconcile_at = clock_timestamp() - interval '1 second'");
+        }
+        var service = service(new BrokerAdapter() {
+            @Override public SubmissionResult submit(Submission ignored) {
+                throw new AssertionError("reconciliation must not submit orders");
+            }
+            @Override public Evidence reconcile(SubmissionKey requested) {
+                assertEquals(key, requested);
+                return new Accepted("sim-reconciled");
+            }
+        });
+        try (var worker = new PostgresOrderReconciliationWorker(candidates, service, 1, Duration.ZERO,
+                DEADLINE, Duration.ofSeconds(1))) {
+            assertEquals(1, worker.runOnce());
+            assertEquals(0, worker.runOnce());
+        }
+        assertEquals(ACKNOWLEDGED, repository.get(key).orElseThrow().status());
     }
 
     private PostgresOrderManagementService service(BrokerAdapter adapter) {

@@ -41,7 +41,8 @@
 ## Sprint 5 — Live trading readiness
 - [x] Simulated OMS with order idempotency, UNKNOWN reconciliation and per-order risk admission
 - [x] Durable simulated OMS reservations and explicit reconciliation
-- [ ] Scheduled reconciliation and authorized external broker adapter
+- [x] Bounded scheduled reconciliation for simulated orders
+- [ ] Authorized external broker adapter
 
 ## Sprint 6 — Production hardening
 - [ ] Security, load tests, HA/DR and recovery drills
