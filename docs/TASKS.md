@@ -24,7 +24,8 @@
 - [x] Historical CSV import, versioned market snapshots and backtest replay feed
 - [x] ClickHouse market observation schema design
 - [x] Persistent ClickHouse batch journal adapter for import and replay
-- [ ] ClickHouse deployment and analytical projection
+- [x] ClickHouse analytical observation view and bounded Java snapshot queries
+- [ ] ClickHouse production deployment and materialized analytical storage
 - [x] Factor metadata, versions and in-memory PIT snapshots
 - [x] Typed factor AST planner and point-in-time expression evaluation
 - [ ] Persistent factor data

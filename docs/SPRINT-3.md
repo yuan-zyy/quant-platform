@@ -37,7 +37,13 @@ Assign one cooperating writer location per endpoint, database and dataset. All w
 
 GitHub Actions starts a temporary ClickHouse instance on loopback and runs Java tests for CSV import, generation recovery after a simulated response loss, and backtest execution. The tests can also be run with `mvn -B -ntp -pl quant-backtest -am -Dquant.clickhouse.url=http://127.0.0.1:8123/ verify` against a test database after applying the batch DDL. Set `QUANT_CLICKHOUSE_USER` and `QUANT_CLICKHOUSE_PASSWORD` if required.
 
-## ClickHouse analytical table design
+## ClickHouse analytical queries
+
+Apply [market_observations_view_v1.sql](../quant-market/src/main/resources/clickhouse/market_observations_view_v1.sql) after the batch table. The view decodes immutable batches at read time, folds physically repeated batch rows and preserves exact prices and timestamps as text. This keeps the batch journal as the only write path. Native SQL callers must parse the time strings before comparing them, since their fractional precision varies.
+
+Java callers can query the view through `ClickHouseMarketObservations.snapshot(datasetVersion, instrument, fromInclusive, toInclusive, asOf, generation)`. The adapter bounds one query to 10,000 projected rows for the selected dataset, instrument and generation. It filters dates and publication time using Java types and returns latest visible observations and a first-publication replay feed. Obtain the pinned generation from the authoritative store. The view scans and decodes batches and assumes a valid journal written through the persistent adapter.
+
+## ClickHouse materialized table design
 
 Store immutable publications in a `MergeTree` table. Keep all versions of each observation so an `as_of` query can select the latest one at or before its cutoff. A background merge must preserve historical publications. The ingest boundary owns uniqueness and conflict validation for `(dataset_version, exchange, symbol, session_date, observation_kind, available_time)`.
 
@@ -45,7 +51,7 @@ The executable DDL lives in [market_observations_v1.sql](../quant-market/src/mai
 
 For a snapshot, filter on dataset version, instrument/date range, `available_time <= as_of` and `import_generation <= pinned_generation`, then group by instrument, date and observation kind and use `argMax(tuple(...), available_time)` to select the payload and timestamps together. Use `argMin` to select first publications for replay. Enforce distinct availability timestamps for different payloads of the same key before loading, so the aggregates have a single winner. A future adapter should expose only fully committed import generations. Reject prices that cannot be represented exactly by the selected decimal scale and validate dates against the supported `DateTime64(9)` range before loading.
 
-GitHub Actions applies this DDL and verifies revision visibility, generation pinning and first-publication replay. A production projection from the persistent batch journal into the analytical observation table remains planned. [MergeTree reference](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree) · [DateTime64 reference](https://clickhouse.com/docs/reference/data-types/datetime64)
+GitHub Actions applies the table and view DDL and checks revision visibility, generation pinning and first-publication replay. Materialized storage for larger workloads remains planned. [MergeTree reference](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree) · [DateTime64 reference](https://clickhouse.com/docs/reference/data-types/datetime64)
 
 ## Factor research data
 
