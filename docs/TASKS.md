@@ -49,4 +49,5 @@
 - [x] PostgreSQL backup and restore drill for task and order recovery
 - [x] Loopback HTTP handler admission and exchange deadline
 - [x] Loopback liveness and bounded readiness probes
+- [x] Low-cardinality loopback HTTP metrics
 - [ ] Security, production load tests and HA/DR deployment validation
