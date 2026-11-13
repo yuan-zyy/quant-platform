@@ -1,0 +1,116 @@
+package io.github.quant.server.demo;
+
+import com.sun.net.httpserver.HttpServer;
+import io.github.quant.backtest.ExecutionCosts;
+import io.github.quant.domain.Instrument;
+import io.github.quant.domain.SecurityType;
+import io.github.quant.domain.TradingRules;
+import io.github.quant.market.Bar;
+import io.github.quant.market.HistoricalDataFeed;
+import io.github.quant.oms.LimitOrder;
+import io.github.quant.server.backtest.BacktestScenarioCatalog;
+import io.github.quant.server.backtest.BacktestTaskScheduler;
+import io.github.quant.server.backtest.http.BacktestHttpApi;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/** Loopback-only demonstration server with a fixed sample scenario. */
+public final class BacktestDemoServer implements AutoCloseable {
+    private static final String TENANT = "local-demo";
+    private static final String SCENARIO = "demo-buy-hold";
+    private static final String CANCEL_SCENARIO = "demo-cancel";
+
+    private final HttpServer server;
+    private final BacktestTaskScheduler scheduler;
+
+    private BacktestDemoServer(HttpServer server, BacktestTaskScheduler scheduler) {
+        this.server = server;
+        this.scheduler = scheduler;
+    }
+
+    public static void main(String[] args) throws Exception {
+        String portText = System.getenv().getOrDefault("QUANT_DEMO_PORT", "8080");
+        var demo = create(Integer.parseInt(portText), System.getenv("QUANT_DEMO_TOKEN"));
+        Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().name("backtest-demo-shutdown").unstarted(demo::close));
+        demo.start();
+        System.out.println("Backtest demo listening at http://127.0.0.1:" + demo.port());
+    }
+
+    public static BacktestDemoServer create(int port, String token) throws IOException {
+        if (token == null || !token.matches("[A-Za-z0-9._~+/-]{16,128}")) {
+            throw new IllegalArgumentException("Set QUANT_DEMO_TOKEN to 16–128 bearer-token characters");
+        }
+        if (port < 0 || port > 65535) throw new IllegalArgumentException("Invalid QUANT_DEMO_PORT");
+
+        var catalog = catalog();
+        byte[] expected = ("Bearer " + token).getBytes(StandardCharsets.US_ASCII);
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 16);
+        var scheduler = new BacktestTaskScheduler(2, 8, 32);
+        server.createContext(BacktestHttpApi.PATH, new BacktestHttpApi(scheduler, exchange -> {
+            var authorization = exchange.getRequestHeaders().get("Authorization");
+            if (authorization == null || authorization.size() != 1) return Optional.empty();
+            byte[] supplied = authorization.getFirst().getBytes(StandardCharsets.UTF_8);
+            return MessageDigest.isEqual(expected, supplied) ? Optional.of(TENANT) : Optional.empty();
+        }, catalog::resolve));
+        return new BacktestDemoServer(server, scheduler);
+    }
+
+    public void start() {
+        server.start();
+    }
+
+    public int port() {
+        return server.getAddress().getPort();
+    }
+
+    @Override
+    public void close() {
+        server.stop(0);
+        scheduler.close();
+    }
+
+    private static BacktestScenarioCatalog catalog() {
+        var stock = new Instrument("600000", "SSE");
+        var firstDate = LocalDate.of(2026, 1, 5);
+        var feed = new HistoricalDataFeed(List.of(
+                session(stock, firstDate, "10.00", "10.20"),
+                session(stock, firstDate.plusDays(1), "10.10", "10.60"),
+                session(stock, firstDate.plusDays(2), "10.65", "10.85")));
+        var scenario = new BacktestScenarioCatalog.Scenario(feed, new BigDecimal("10000"),
+                Map.of(stock, TradingRules.forType(SecurityType.A_SHARE)), ExecutionCosts.NONE,
+                () -> (close, context) -> close.date().equals(firstDate)
+                        ? List.of(new LimitOrder.Request(stock, LimitOrder.Side.BUY, 100, close.bar().close()))
+                        : List.of());
+        var cancelScenario = new BacktestScenarioCatalog.Scenario(feed, scenario.startingCash(), scenario.rules(),
+                ExecutionCosts.NONE, () -> (close, context) -> {
+                    if (close.date().equals(firstDate)) {
+                        try {
+                            Thread.sleep(10_000);
+                        } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException("Demo scenario interrupted", interrupted);
+                        }
+                    }
+                    return List.of();
+                });
+        return new BacktestScenarioCatalog(Map.of(
+                new BacktestScenarioCatalog.Key(TENANT, SCENARIO), scenario,
+                new BacktestScenarioCatalog.Key(TENANT, CANCEL_SCENARIO), cancelScenario));
+    }
+
+    private static HistoricalDataFeed.Session session(Instrument instrument, LocalDate date,
+                                                       String openPrice, String closePrice) {
+        var open = new BigDecimal(openPrice);
+        var close = new BigDecimal(closePrice);
+        var bar = new Bar(date, open, open.max(close), open.min(close), close, 100_000);
+        return new HistoricalDataFeed.Session(instrument, bar, 1_000, HistoricalDataFeed.closeTime(bar));
+    }
+}

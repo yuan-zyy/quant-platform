@@ -14,6 +14,8 @@ The scheduler bounds workers, queued tasks and retained history. Completed tasks
 
 This service stores task state in process memory. Configure authenticated transport, quotas and durable task state before operating it as a production tenant service. The HTTP adapter runs registered scenarios supplied by the operator.
 
+The [local Vue console](CONSOLE.md) exercises this API against a loopback demo server.
+
 ## Paper broker
 
 `quant-paper` provides an in-memory simulated brokerage account. Instantiate a `PaperBroker` with cash, instrument rules and execution costs. Submit or cancel a limit order using its client order ID, then feed historical or simulated opening observations to advance matching. The paper broker shares the replay matcher, so lot size, opening liquidity, slippage, fees, cash checks and T+1 eligibility follow the same rules.

@@ -33,7 +33,8 @@
 ## Sprint 4 — Platform and paper trading
 - [x] Tenant-scoped backtest task API, in-memory scheduling and cancellation
 - [x] Deterministic in-memory PaperBroker and command/event deduplication
-- [ ] Durable task state, deployment authentication, Vue console and persistent paper accounts
+- [x] Local Vue backtest console for submission, task metrics and cancellation
+- [ ] Durable task state, deployment authentication and persistent paper accounts
 
 ## Sprint 5 — Live trading readiness
 - [ ] OMS/RMS, idempotency, UNKNOWN state recovery and authorized broker adapter

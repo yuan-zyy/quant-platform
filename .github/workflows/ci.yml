@@ -30,6 +30,33 @@ jobs:
           SANDBOX_IMAGE: ${{ steps.sandbox.outputs.image }}
           QUANT_HOST_SECRET: smoke-probe
         run: mvn -B -ntp -Dquant.python=python "-Dquant.sandbox.image=$SANDBOX_IMAGE" verify
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web-console/package-lock.json
+      - name: Build the Vue console
+        working-directory: web-console
+        run: |
+          npm ci
+          npm run build
+      - name: Verify console client with the Java demo
+        env:
+          QUANT_DEMO_TOKEN: local-ci-console-test-token
+          QUANT_CONSOLE_TEST_URL: http://127.0.0.1:8080
+        run: |
+          classpath=$(printf '%s/target/classes:' quant-server quant-backtest quant-domain quant-event quant-market quant-oms quant-portfolio)
+          java -cp "${classpath%:}" io.github.quant.server.demo.BacktestDemoServer &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..20}; do
+            if curl --silent --output /dev/null --max-time 1 "$QUANT_CONSOLE_TEST_URL/v1/backtests"; then
+              break
+            fi
+            [[ "$attempt" != 20 ]]
+            sleep 1
+          done
+          npm --prefix web-console test
   clickhouse:
     name: ClickHouse market data smoke test
     runs-on: ubuntu-latest

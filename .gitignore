@@ -10,5 +10,6 @@ target/
 __pycache__/
 .pytest_cache/
 dist/
+node_modules/
 build/
 *.log
