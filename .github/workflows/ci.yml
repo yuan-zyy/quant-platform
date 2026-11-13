@@ -30,3 +30,30 @@ jobs:
           SANDBOX_IMAGE: ${{ steps.sandbox.outputs.image }}
           QUANT_HOST_SECRET: smoke-probe
         run: mvn -B -ntp -Dquant.python=python "-Dquant.sandbox.image=$SANDBOX_IMAGE" verify
+  clickhouse:
+    name: ClickHouse market data smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start temporary ClickHouse container
+        run: docker run --detach --name quant-clickhouse --network none clickhouse/clickhouse-server:26.8.36.3
+      - name: Apply schema and verify publication history
+        run: |
+          for attempt in {1..30}; do
+            if timeout 5s docker exec quant-clickhouse clickhouse-client --query 'SELECT 1'; then
+              break
+            fi
+            if [[ "$attempt" == 30 ]]; then
+              exit 1
+            fi
+            sleep 2
+          done
+          docker exec -i quant-clickhouse clickhouse-client --multiquery < quant-market/src/main/resources/clickhouse/market_observations_v1.sql
+          docker exec -i quant-clickhouse clickhouse-client --multiquery < quant-market/src/test/resources/clickhouse/market_observations_smoke.sql
+      - name: Collect ClickHouse logs on failure
+        if: failure()
+        run: docker logs --tail 100 quant-clickhouse
+      - name: Remove temporary container and volumes
+        if: always()
+        run: docker rm --force --volumes quant-clickhouse

@@ -23,30 +23,8 @@ CSV columns are `dataset_version,event_type,symbol,exchange,session_date,event_t
 
 Store immutable publications in a `MergeTree` table. Keep all versions of each observation so an `as_of` query can select the latest one at or before its cutoff. A background merge must preserve historical publications. The ingest boundary owns uniqueness and conflict validation for `(dataset_version, exchange, symbol, session_date, observation_kind, available_time)`.
 
-```sql
-CREATE TABLE market_observations_v1
-(
-    dataset_version String,
-    import_generation Int64,
-    exchange LowCardinality(String),
-    symbol String,
-    session_date Date32,
-    observation_kind Enum8('open' = 1, 'close' = 2),
-    event_time DateTime64(9, 'UTC'),
-    available_time DateTime64(9, 'UTC'),
-    open_price Decimal(38, 12),
-    opening_quantity Nullable(Int64),
-    high_price Nullable(Decimal(38, 12)),
-    low_price Nullable(Decimal(38, 12)),
-    close_price Nullable(Decimal(38, 12)),
-    session_volume Nullable(Int64),
-    CONSTRAINT available_after_event CHECK available_time >= event_time
-)
-ENGINE = MergeTree
-PARTITION BY toYYYYMM(session_date)
-ORDER BY (dataset_version, exchange, symbol, session_date, observation_kind, available_time);
-```
+The executable DDL lives in [market_observations_v1.sql](../quant-market/src/main/resources/clickhouse/market_observations_v1.sql).
 
 For a snapshot, filter on dataset version, instrument/date range, `available_time <= as_of` and `import_generation <= pinned_generation`, then group by instrument, date and observation kind and use `argMax(tuple(...), available_time)` to select the payload and timestamps together. Use `argMin` to select first publications for replay. Enforce distinct availability timestamps for different payloads of the same key before loading, so the aggregates have a single winner. A future adapter should expose only fully committed import generations. Reject prices that cannot be represented exactly by the selected decimal scale and validate dates against the supported `DateTime64(9)` range before loading.
 
-This DDL is a storage design for a future ClickHouse adapter. The current executable importer and snapshot store use process memory. ClickHouse deployment, persistent batch manifests, and factor data remain future work. [MergeTree reference](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree) · [DateTime64 reference](https://clickhouse.com/docs/reference/data-types/datetime64)
+GitHub Actions applies this DDL in a temporary ClickHouse container and verifies revision visibility, generation pinning and first-publication replay. The current executable importer and snapshot store use process memory. ClickHouse deployment, persistent batch manifests, and factor data remain future work. [MergeTree reference](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/mergetree) · [DateTime64 reference](https://clickhouse.com/docs/reference/data-types/datetime64)
