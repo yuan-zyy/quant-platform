@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 
 final class DailyReplay {
     private record Mark(Instant time, BigDecimal price) {}
@@ -54,12 +55,17 @@ final class DailyReplay {
 
     BacktestEngine.ReplayResult run(DataFeed feed) {
         var observations = new ArrayList<DataFeed.Observation>();
-        feed.replay(event -> observations.add(Objects.requireNonNull(event)));
+        feed.replay(event -> {
+            checkCanceled();
+            observations.add(Objects.requireNonNull(event));
+        });
+        checkCanceled();
         observations.sort(CANONICAL_ORDER);
         var sessions = new HashSet<SessionKey>();
         var loop = new EventLoop<DataFeed.Observation>();
         long sequence = 0;
         for (var event : observations) {
+            checkCanceled();
             boolean opening = event instanceof Open;
             if (!rules.containsKey(event.instrument())) {
                 throw new IllegalArgumentException("missing trading rules for " + event.instrument());
@@ -79,6 +85,7 @@ final class DailyReplay {
     }
 
     private void process(TimedEvent<DataFeed.Observation> event) {
+        checkCanceled();
         clock.advanceTo(event.availableTime());
         switch (event.payload()) {
             case Open open -> {
@@ -98,6 +105,10 @@ final class DailyReplay {
                 List.copyOf(strategy.onClose(close, context)).forEach(this::submit);
             }
         }
+    }
+
+    private static void checkCanceled() {
+        if (Thread.currentThread().isInterrupted()) throw new CancellationException("backtest interrupted");
     }
 
     private void mark(Instrument instrument, Instant eventTime, BigDecimal price) {

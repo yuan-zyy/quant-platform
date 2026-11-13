@@ -31,7 +31,8 @@
 - [x] Persistent ClickHouse factor definitions, values and planner read views
 
 ## Sprint 4 — Platform and paper trading
-- [ ] Tenant-aware API, task scheduler, Vue console and PaperBroker
+- [x] Tenant-scoped backtest task API, in-memory scheduling and cancellation
+- [ ] Durable task state, deployment authentication, Vue console and PaperBroker
 
 ## Sprint 5 — Live trading readiness
 - [ ] OMS/RMS, idempotency, UNKNOWN state recovery and authorized broker adapter
