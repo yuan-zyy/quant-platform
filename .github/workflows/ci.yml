@@ -61,6 +61,8 @@ jobs:
             sleep 1
           done
           npm --prefix web-console test
+          node --test tools/load/backtest-load.test.mjs
+          QUANT_LOAD_URL="$QUANT_CONSOLE_TEST_URL" QUANT_LOAD_JOBS=12 QUANT_LOAD_CONCURRENCY=4 node tools/load/backtest-load.mjs
   clickhouse:
     name: ClickHouse market data smoke test
     runs-on: ubuntu-latest

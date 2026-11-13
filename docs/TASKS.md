@@ -45,4 +45,5 @@
 - [ ] Authorized external broker adapter
 
 ## Sprint 6 — Production hardening
-- [ ] Security, load tests, HA/DR and recovery drills
+- [x] Reproducible loopback backtest load smoke test and latency reporting
+- [ ] Security, production load tests, HA/DR and recovery drills
