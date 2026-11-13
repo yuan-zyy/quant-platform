@@ -35,7 +35,8 @@
 - [x] Deterministic in-memory PaperBroker and command/event deduplication
 - [x] Local Vue backtest console for submission, task metrics and cancellation
 - [x] PostgreSQL task state, idempotent submissions and leased recovery
-- [ ] Deployment authentication and persistent paper accounts
+- [x] Restartable local paper accounts with a command journal
+- [ ] Deployment authentication and production paper account storage
 
 ## Sprint 5 — Live trading readiness
 - [ ] OMS/RMS, idempotency, UNKNOWN state recovery and authorized broker adapter
