@@ -46,4 +46,5 @@
 
 ## Sprint 6 — Production hardening
 - [x] Reproducible loopback backtest load smoke test and latency reporting
-- [ ] Security, production load tests, HA/DR and recovery drills
+- [x] PostgreSQL backup and restore drill for task and order recovery
+- [ ] Security, production load tests and HA/DR deployment validation

@@ -144,3 +144,17 @@ jobs:
           POSTGRES_TEST_USER: quant_ci
           POSTGRES_TEST_PASSWORD: quant_ci_password
         run: mvn -B -ntp -Ppostgres -pl quant-server -am "-Dquant.postgres.url=$POSTGRES_TEST_URL" verify
+      - name: Restore a disposable backup and run recovered workers
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          POSTGRES_PORT: ${{ job.services.postgres.ports[5432] }}
+          POSTGRES_TEST_USER: quant_ci
+          POSTGRES_TEST_PASSWORD: quant_ci_password
+          PGUSER: quant_ci
+          PGPASSWORD: quant_ci_password
+        run: |
+          bash tools/recovery/postgres-restore.sh "$POSTGRES_CONTAINER" bash -euc '
+            mvn -B -ntp -Ppostgres -pl quant-server -am -Dtest=PostgresRestoreSmokeTest \
+              -Dsurefire.failIfNoSpecifiedTests=false \
+              "-Dquant.postgres.restore.url=jdbc:postgresql://127.0.0.1:$POSTGRES_PORT/$QUANT_RECOVERY_RESTORED_DB" test
+          '
