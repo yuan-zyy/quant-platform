@@ -32,3 +32,5 @@ npm run dev
 ```
 
 Open the local address printed by Vite. Enter the same demo token and run `demo-buy-hold`. To exercise cancellation, submit `demo-cancel` and cancel it while active. The browser keeps the token in memory during the page session. The Vite proxy forwards API calls to the Java server at `127.0.0.1:8080`. If you change `QUANT_DEMO_PORT`, set it to the same value in both terminals. Use a demo token of 16 to 128 characters. The demo uses a single configured tenant and local transport.
+
+To start the server using token fingerprints, set `QUANT_DEMO_CREDENTIALS` to a protected UTF-8 file and omit `QUANT_DEMO_TOKEN` from the server environment. Write one line with the SHA-256 hex digest of the token, a space and `local-demo`. Enter the original token in the console. The server reads the file at startup and rejects malformed or repeated fingerprints.

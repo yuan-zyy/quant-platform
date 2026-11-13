@@ -11,11 +11,13 @@ import io.github.quant.oms.LimitOrder;
 import io.github.quant.server.backtest.BacktestScenarioCatalog;
 import io.github.quant.server.backtest.BacktestTaskScheduler;
 import io.github.quant.server.backtest.http.BacktestHttpApi;
+import io.github.quant.server.backtest.http.BearerTenantAuthenticator;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.util.List;
@@ -38,7 +40,14 @@ public final class BacktestDemoServer implements AutoCloseable {
 
     public static void main(String[] args) throws Exception {
         String portText = System.getenv().getOrDefault("QUANT_DEMO_PORT", "8080");
-        var demo = create(Integer.parseInt(portText), System.getenv("QUANT_DEMO_TOKEN"));
+        int port = Integer.parseInt(portText);
+        String token = System.getenv("QUANT_DEMO_TOKEN");
+        String credentials = System.getenv("QUANT_DEMO_CREDENTIALS");
+        if (token != null && credentials != null) {
+            throw new IllegalArgumentException("Set only one demo credential source");
+        }
+        var demo = credentials == null ? create(port, token)
+                : create(port, BearerTenantAuthenticator.fromFile(Path.of(credentials)));
         Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().name("backtest-demo-shutdown").unstarted(demo::close));
         demo.start();
         System.out.println("Backtest demo listening at http://127.0.0.1:" + demo.port());
@@ -48,18 +57,21 @@ public final class BacktestDemoServer implements AutoCloseable {
         if (token == null || !token.matches("[A-Za-z0-9._~+/-]{16,128}")) {
             throw new IllegalArgumentException("Set QUANT_DEMO_TOKEN to 16–128 bearer-token characters");
         }
-        if (port < 0 || port > 65535) throw new IllegalArgumentException("Invalid QUANT_DEMO_PORT");
-
-        var catalog = catalog();
         byte[] expected = ("Bearer " + token).getBytes(StandardCharsets.US_ASCII);
-        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 16);
-        var scheduler = new BacktestTaskScheduler(2, 8, 32);
-        server.createContext(BacktestHttpApi.PATH, new BacktestHttpApi(scheduler, exchange -> {
+        return create(port, exchange -> {
             var authorization = exchange.getRequestHeaders().get("Authorization");
             if (authorization == null || authorization.size() != 1) return Optional.empty();
             byte[] supplied = authorization.getFirst().getBytes(StandardCharsets.UTF_8);
             return MessageDigest.isEqual(expected, supplied) ? Optional.of(TENANT) : Optional.empty();
-        }, catalog::resolve));
+        });
+    }
+
+    private static BacktestDemoServer create(int port, BacktestHttpApi.TenantAuthenticator authenticator) throws IOException {
+        if (port < 0 || port > 65535) throw new IllegalArgumentException("Invalid QUANT_DEMO_PORT");
+        var catalog = catalog();
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 16);
+        var scheduler = new BacktestTaskScheduler(2, 8, 32);
+        server.createContext(BacktestHttpApi.PATH, new BacktestHttpApi(scheduler, authenticator, catalog::resolve));
         return new BacktestDemoServer(server, scheduler);
     }
 

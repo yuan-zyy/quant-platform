@@ -46,9 +46,13 @@ jobs:
           QUANT_CONSOLE_TEST_URL: http://127.0.0.1:8080
         run: |
           classpath=$(printf '%s/target/classes:' quant-server quant-backtest quant-domain quant-event quant-market quant-oms quant-portfolio)
-          java -cp "${classpath%:}" io.github.quant.server.demo.BacktestDemoServer &
+          credentials=$(mktemp)
+          fingerprint=$(printf '%s' "$QUANT_DEMO_TOKEN" | sha256sum | cut -d ' ' -f 1)
+          printf '%s local-demo\n' "$fingerprint" > "$credentials"
+          env -u QUANT_DEMO_TOKEN QUANT_DEMO_CREDENTIALS="$credentials" \
+            java -cp "${classpath%:}" io.github.quant.server.demo.BacktestDemoServer &
           server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          trap 'kill "$server_pid" 2>/dev/null || true; rm -f -- "$credentials"' EXIT
           for attempt in {1..20}; do
             if curl --silent --output /dev/null --max-time 1 "$QUANT_CONSOLE_TEST_URL/v1/backtests"; then
               break
