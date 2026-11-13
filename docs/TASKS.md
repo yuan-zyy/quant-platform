@@ -50,4 +50,5 @@
 - [x] Loopback HTTP handler admission and exchange deadline
 - [x] Loopback liveness and bounded readiness probes
 - [x] Low-cardinality loopback HTTP metrics
+- [x] Bounded redacted request audit events
 - [ ] Security, production load tests and HA/DR deployment validation

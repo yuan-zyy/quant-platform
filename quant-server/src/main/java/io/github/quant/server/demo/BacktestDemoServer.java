@@ -13,6 +13,7 @@ import io.github.quant.server.backtest.BacktestTaskScheduler;
 import io.github.quant.server.backtest.http.BacktestHttpApi;
 import io.github.quant.server.backtest.http.BearerTenantAuthenticator;
 import io.github.quant.server.backtest.http.InFlightRequestGuard;
+import io.github.quant.server.audit.BacktestAuditLog;
 import io.github.quant.server.health.HealthHttpHandler;
 import io.github.quant.server.observability.HttpTelemetry;
 import io.github.quant.server.observability.MetricsHttpHandler;
@@ -93,7 +94,8 @@ public final class BacktestDemoServer implements AutoCloseable {
         var api = new BacktestHttpApi(scheduler, authenticator, catalog::resolve);
         var telemetry = new HttpTelemetry();
         var guarded = new InFlightRequestGuard(8, api, deadlines, Duration.ofSeconds(5));
-        server.createContext(BacktestHttpApi.PATH, telemetry.instrument(guarded));
+        var audit = new BacktestAuditLog(256);
+        server.createContext(BacktestHttpApi.PATH, telemetry.instrument(audit.instrument(guarded)));
         server.createContext(MetricsHttpHandler.PATH, new MetricsHttpHandler(telemetry));
         var health = new HealthHttpHandler(Duration.ofMillis(500), () -> !requests.isShutdown());
         server.createContext("/health", health);
